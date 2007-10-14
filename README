@@ -1,0 +1,30 @@
+NAME
+    Apache2::AuthenOpenID - OpenID authen hander for mod_perl2.
+
+SYNOPSIS
+      LoadModule perl_module modules/mod_perl.so
+      PerlLoadModule Apache2::AuthenOpenID
+
+      AuthType OpenID
+      AuthName "My private documents"
+      return_to http://sample.com/path/to/callback
+      trust_root http://sample.com/your/trust_root/
+      consumer_secret "your consumer secret"
+      require user sample.com/someidentity
+
+DESCRIPTION
+    You can distinguish users with OpenID using this module.
+
+SEE ALSO
+    Net::OpenID::Consumer <http://openid.net>
+
+AUTHOR
+    Nobuo Danjou, nobuo.danjou@gmail.com
+
+COPYRIGHT AND LICENSE
+    Copyright (C) 2007 by Nobuo Danjou
+
+    This library is free software; you can redistribute it and/or modify it
+    under the same terms as Perl itself, either Perl version 5.8.8 or, at
+    your option, any later version of Perl 5 you may have available.
+
