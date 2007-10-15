@@ -6,6 +6,7 @@ use warnings;
 use Apache2::RequestRec ();
 use Apache2::Module;
 use Apache2::ServerUtil;
+use Apache2::Log;
 use Apache2::Const -compile => qw(
     HTTP_UNAUTHORIZED OK DECLINED REDIRECT OR_AUTHCFG TAKE1
 );
@@ -15,32 +16,35 @@ use Net::OpenID::Consumer;
 use Digest::HMAC_SHA1;
 use LWPx::ParanoidAgent;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 my @directives = (
     {
         name            => 'AuthType',
         func            => __PACKAGE__ . '::AuthType',
         req_override    => Apache2::Const::OR_AUTHCFG,
-        args_how        => Apache2::Const::TAKE1
+        args_how        => Apache2::Const::TAKE1,
     },
     {
         name            => 'return_to',
         func            => __PACKAGE__ . '::return_to',
         req_override    => Apache2::Const::OR_AUTHCFG,
-        args_how        => Apache2::Const::TAKE1
+        args_how        => Apache2::Const::TAKE1,
+        errmsg          => 'return_to http://sample.com/trust_root/callback',
     },
     {
         name            => 'trust_root',
         func            => __PACKAGE__ . '::trust_root',
         req_override    => Apache2::Const::OR_AUTHCFG,
-        args_how        => Apache2::Const::TAKE1
+        args_how        => Apache2::Const::TAKE1,
+        errmsg          => 'return_to http://sample.com/trust_root/',
     },
     {
         name            => 'consumer_secret',
         func            => __PACKAGE__ . '::consumer_secret',
         req_override    => Apache2::Const::OR_AUTHCFG,
-        args_how        => Apache2::Const::TAKE1
+        args_how        => Apache2::Const::TAKE1,
+        errmsg          => 'consumer_secret "Your consumer secret goes here"',
     },
 );
 
@@ -77,8 +81,15 @@ sub handler {
     my $r = shift;
 
     $r->auth_type =~ m{^OpenID$}i or return Apache2::Const::DECLINED;
-    (my $cookie_name = __PACKAGE__."-".$r->auth_name) =~ s/::/-/g;
-    my $dest_cookie_name = $cookie_name.'-destination';
+
+    my $cf = Apache2::Module::get_config(__PACKAGE__, $r->server);
+    unless ($cf->{'trust_root'} && $cf->{'return_to'} && $cf->{'consumer_secret'}) {
+        $r->log_error("You need to specify trust_root, return_to, and consumer_secret.");
+        die;
+    }
+
+    (my $cookie_name = __PACKAGE__."-".$r->auth_name) =~ s/(::|\s+)/-/g;
+    my $cookie_dest_name = $cookie_name.'-destination';
     &set_custom_response($r);
 
     $r->err_headers_out->set('Pragma' => 'no-chache');
@@ -87,14 +98,12 @@ sub handler {
             => 'private, no-chache, no-store, must-revalidate, max-age=0'
     );
 
-    my $cf = Apache2::Module::get_config(__PACKAGE__, $r->server);
-
     my $request_url = "http://"
         . ($r->headers_in->{'X-Forwarded-Host'} || $r->hostname)
         . $r->uri;
 
     my $q = CGI->new($r);
-    my %cookie = CGI::Cookie->parse($r->headers_in->{Cookie});
+    my %cookie_in = CGI::Cookie->parse($r->headers_in->{Cookie});
 
     my $csr = Net::OpenID::Consumer->new(
         args => $q,
@@ -120,41 +129,41 @@ sub handler {
             $url =~ s{(^https?://|/$)}{}g;
             my $time = time();
             my $token = &calc_token($url, $time, $cf->{'consumer_secret'});
-            my $cookie = CGI::Cookie->new(
+            my $cookie_out = CGI::Cookie->new(
                 -name => $cookie_name,
                 -value => [ $url, $time, $token ],
             );
             $r->user($url);
-            if (%cookie && (my $dest = $cookie{$dest_cookie_name})) {
+            if (%cookie_in && (my $dest = $cookie_in{$cookie_dest_name})) {
                 $r->headers_out->set('Location' => $dest->value);
             } else {
                 $r->headers_out->set('Location' => $cf->{'trust_root'});
             }
-            my $erase = CGI::Cookie->new(
-                -name => $dest_cookie_name,
+            my $cookie_dest_erase = CGI::Cookie->new(
+                -name => $cookie_dest_name,
                 -value => 'erase',
                 -expires => '-1d',
             );
-            $r->err_headers_out->add('Set-Cookie' => $cookie);
-            $r->err_headers_out->add('Set-Cookie' => $erase);
+            $r->err_headers_out->add('Set-Cookie' => $cookie_out);
+            $r->err_headers_out->add('Set-Cookie' => $cookie_dest_erase);
             return Apache2::Const::REDIRECT;
         }
         return Apache2::Const::HTTP_UNAUTHORIZED;
     }
-    if (%cookie && $cookie{$cookie_name}){
-        my ($url, $time, $token) = $cookie{$cookie_name}->value;
+    if (%cookie_in && $cookie_in{$cookie_name}){
+        my ($url, $time, $token) = $cookie_in{$cookie_name}->value;
         if (&calc_token($url, $time, $cf->{'consumer_secret'}) eq $token) {
             $r->user($url);
             return Apache2::Const::OK;
         }
     }
-    unless (%cookie && $cookie{$dest_cookie_name}) {
-        my $dest_cookie = CGI::Cookie->new(
-            -name => $dest_cookie_name,
+    unless (%cookie_in && $cookie_in{$cookie_dest_name}) {
+        my $cookie_dest_out = CGI::Cookie->new(
+            -name => $cookie_dest_name,
             -value => $request_url,
             -expires => '+10m',
         );
-        $r->err_headers_out->set('Set-Cookie' => $dest_cookie);
+        $r->err_headers_out->set('Set-Cookie' => $cookie_dest_out);
     }
     return Apache2::Const::HTTP_UNAUTHORIZED;
 }
@@ -164,9 +173,11 @@ sub set_custom_response {
     my $cf = Apache2::Module::get_config(__PACKAGE__, $r->server);
     my $auth_name = $r->auth_name;
     my $html = <<END;
-<html>
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
 <head>
     <title>401 Unauthorized</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta http-equiv="Content-Style-Type" content="text/css">
     <style type="text/css"><!--
         body {
@@ -191,8 +202,8 @@ sub set_custom_response {
     <form action="$cf->{'return_to'}" method="POST">
         <p>
         Please enter your OpenID identifiier:<br>
-        <input id="identity" type="text" name="identity">
-        <input type="submit" value="Login with OpenID">
+        <input id="identity" type="text" name="identity" value="" tabindex="1">
+        <input type="submit" value="Login with OpenID" tabindex="2">
         </p>
     </form>
 </body>
@@ -225,12 +236,12 @@ Apache2::AuthenOpenID - OpenID authen hander for mod_perl2.
   LoadModule perl_module modules/mod_perl.so
   PerlLoadModule Apache2::AuthenOpenID
 
-  AuthType OpenID
-  AuthName "My private documents"
-  return_to http://sample.com/path/to/callback
-  trust_root http://sample.com/your/trust_root/
-  consumer_secret "your consumer secret"
-  require user sample.com/someidentity
+  AuthType          OpenID
+  AuthName          "My private documents"
+  return_to         http://sample.com/path/to/callback
+  trust_root        http://sample.com/your/trust_root/
+  consumer_secret   "your consumer secret"
+  require           user sample.com/someidentity
 
 =head1 DESCRIPTION
 
@@ -239,7 +250,7 @@ You can distinguish users with OpenID using this module.
 =head1 SEE ALSO
 
 L<Net::OpenID::Consumer>
-L<http://openid.net>
+L<http://openid.net/>
 
 =head1 AUTHOR
 

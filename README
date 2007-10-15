@@ -5,18 +5,18 @@ SYNOPSIS
       LoadModule perl_module modules/mod_perl.so
       PerlLoadModule Apache2::AuthenOpenID
 
-      AuthType OpenID
-      AuthName "My private documents"
-      return_to http://sample.com/path/to/callback
-      trust_root http://sample.com/your/trust_root/
-      consumer_secret "your consumer secret"
-      require user sample.com/someidentity
+      AuthType          OpenID
+      AuthName          "My private documents"
+      return_to         http://sample.com/path/to/callback
+      trust_root        http://sample.com/your/trust_root/
+      consumer_secret   "your consumer secret"
+      require           user sample.com/someidentity
 
 DESCRIPTION
     You can distinguish users with OpenID using this module.
 
 SEE ALSO
-    Net::OpenID::Consumer <http://openid.net>
+    Net::OpenID::Consumer <http://openid.net/>
 
 AUTHOR
     Nobuo Danjou, nobuo.danjou@gmail.com
