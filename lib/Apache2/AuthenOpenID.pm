@@ -15,82 +15,90 @@ use CGI::Cookie;
 use Net::OpenID::Consumer;
 use Digest::HMAC_SHA1;
 use LWPx::ParanoidAgent;
+use base qw( Class::Data::Inheritable );
 
-our $VERSION = '0.02';
+our $VERSION = '0.04';
 
-my @directives = (
-    {
-        name            => 'AuthType',
-        func            => __PACKAGE__ . '::AuthType',
-        req_override    => Apache2::Const::OR_AUTHCFG,
-        args_how        => Apache2::Const::TAKE1,
-    },
-    {
-        name            => 'return_to',
-        func            => __PACKAGE__ . '::return_to',
-        req_override    => Apache2::Const::OR_AUTHCFG,
-        args_how        => Apache2::Const::TAKE1,
-        errmsg          => 'return_to http://sample.com/trust_root/callback',
-    },
-    {
-        name            => 'trust_root',
-        func            => __PACKAGE__ . '::trust_root',
-        req_override    => Apache2::Const::OR_AUTHCFG,
-        args_how        => Apache2::Const::TAKE1,
-        errmsg          => 'return_to http://sample.com/trust_root/',
-    },
-    {
-        name            => 'consumer_secret',
-        func            => __PACKAGE__ . '::consumer_secret',
-        req_override    => Apache2::Const::OR_AUTHCFG,
-        args_how        => Apache2::Const::TAKE1,
-        errmsg          => 'consumer_secret "Your consumer secret goes here"',
-    },
-);
+__PACKAGE__->mk_classdata( auth_type => 'openid' );
+__PACKAGE__->init;
 
-eval { Apache2::Module::add(__PACKAGE__, \@directives); };
+
+sub init {
+    my $self = shift;
+
+    my @directives = (
+        {
+            name            => 'AuthType',
+            req_override    => Apache2::Const::OR_AUTHCFG,
+            args_how        => Apache2::Const::TAKE1,
+        },
+        {
+            name            => 'return_to',
+            req_override    => Apache2::Const::OR_AUTHCFG,
+            args_how        => Apache2::Const::TAKE1,
+            errmsg          => 'return_to http://sample.com/trust_root/callback',
+        },
+        {
+            name            => 'trust_root',
+            req_override    => Apache2::Const::OR_AUTHCFG,
+            args_how        => Apache2::Const::TAKE1,
+            errmsg          => 'return_to http://sample.com/trust_root/',
+        },
+        {
+            name            => 'consumer_secret',
+            req_override    => Apache2::Const::OR_AUTHCFG,
+            args_how        => Apache2::Const::TAKE1,
+            errmsg          => 'consumer_secret "Your consumer secret goes here"',
+        },
+    );
+
+    eval { 
+        Apache2::Module::add($self, \@directives); 
+    };
+}
 
 sub AuthType {
-    my ($i, $params, $arg) = @_;
-    if ($arg =~ /^OpenID$/i) {
+    my ($self, $params, $arg) = @_;
+    my $class = ref $self;
+    if (lc $arg eq lc $self->auth_type) {
         Apache2::ServerUtil->server->push_handlers(
-            PerlAuthenHandler => \&handler
+            PerlAuthenHandler => $class,
         );
     }
 }
 
 sub return_to {
-    my ($i, $params, $arg) = @_;
-    $i = Apache2::Module::get_config(__PACKAGE__, $params->server);
+    my ($self, $params, $arg) = @_;
+    my $class = ref $self;
+    my $i = Apache2::Module::get_config($class, $params->server);
     $i->{'return_to'} = $arg;
 }
 
 sub trust_root {
-    my ($i, $params, $arg) = @_;
-    $i = Apache2::Module::get_config(__PACKAGE__, $params->server);
+    my ($self, $params, $arg) = @_;
+    my $class = ref $self;
+    my $i = Apache2::Module::get_config($class, $params->server);
     $i->{'trust_root'} = $arg;
 }
 
 sub consumer_secret {
-    my ($i, $params, $arg) = @_;
-    $i = Apache2::Module::get_config(__PACKAGE__, $params->server);
+    my ($self, $params, $arg) = @_;
+    my $class = ref $self;
+    my $i = Apache2::Module::get_config($class, $params->server);
     $i->{'consumer_secret'} = $arg;
 }
 
-sub handler {
-    my $r = shift;
-
-    $r->auth_type =~ m{^OpenID$}i or return Apache2::Const::DECLINED;
-
-    my $cf = Apache2::Module::get_config(__PACKAGE__, $r->server);
+sub handler : method {
+    my ($self, $r) = @_;
+    lc $r->auth_type eq lc $self->auth_type or return Apache2::Const::DECLINED;
+    my $cf = Apache2::Module::get_config($self, $r->server);
     unless ($cf->{'trust_root'} && $cf->{'return_to'} && $cf->{'consumer_secret'}) {
         $r->log_error("You need to specify trust_root, return_to, and consumer_secret.");
         die;
     }
-
-    (my $cookie_name = __PACKAGE__."-".$r->auth_name) =~ s/(::|\s+)/-/g;
+    (my $cookie_name = $self."-".$r->auth_name) =~ s/(::|\s+)/-/g;
     my $cookie_dest_name = $cookie_name.'-destination';
-    &set_custom_response($r);
+    $self->set_custom_response($r);
 
     $r->err_headers_out->set('Pragma' => 'no-chache');
     $r->err_headers_out->set(
@@ -112,7 +120,8 @@ sub handler {
     );
     if ($request_url eq $cf->{'return_to'}) {
         if (my $identity = $q->param('identity')) {
-            my $claimed_identity = $csr->claimed_identity($identity);
+            my $claimed_identity = $csr->claimed_identity($identity)
+                or return Apache2::Const::HTTP_UNAUTHORIZED;
             my $check_url = $claimed_identity->check_url(
                 return_to => $cf->{'return_to'},
                 trust_root => $cf->{'trust_root'},
@@ -128,7 +137,7 @@ sub handler {
             my $url = $vident->url;
             $url =~ s{(^https?://|/$)}{}g;
             my $time = time();
-            my $token = &calc_token($url, $time, $cf->{'consumer_secret'});
+            my $token = $self->calc_token($url, $time, $cf->{'consumer_secret'});
             my $cookie_out = CGI::Cookie->new(
                 -name => $cookie_name,
                 -value => [ $url, $time, $token ],
@@ -152,7 +161,7 @@ sub handler {
     }
     if (%cookie_in && $cookie_in{$cookie_name}){
         my ($url, $time, $token) = $cookie_in{$cookie_name}->value;
-        if (&calc_token($url, $time, $cf->{'consumer_secret'}) eq $token) {
+        if ($self->calc_token($url, $time, $cf->{'consumer_secret'}) eq $token) {
             $r->user($url);
             return Apache2::Const::OK;
         }
@@ -169,8 +178,8 @@ sub handler {
 }
 
 sub set_custom_response {
-    my $r = shift;
-    my $cf = Apache2::Module::get_config(__PACKAGE__, $r->server);
+    my ($self, $r) = @_;
+    my $cf = Apache2::Module::get_config($self, $r->server);
     my $auth_name = $r->auth_name;
     my $html = <<END;
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
@@ -216,7 +225,7 @@ END
 }
 
 sub calc_token {
-    my ($url, $time, $consumer_secret) = @_;
+    my ($self, $url, $time, $consumer_secret) = @_;
     my $context = Digest::HMAC_SHA1->new($consumer_secret);
     $context->add($url);
     $context->add($time);

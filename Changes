@@ -1,11 +1,17 @@
 Revision history for Perl extension Apache2::AuthenOpenID.
 
+0.04  Sat Nov 10 12:21:00 JST 2007
+    - made inheritable
+
+0.03  Mon Oct 16 09:30:00 2007
+    - add identity check
+
 0.02  Mon Oct 15 10:40:00 2007
-	- made HTML tidy
+    - made HTML tidy
     - modify variable names
     - add configuration check
 
 0.01  Sun Oct 14 09:30:07 2007
-	- original version; created by h2xs 1.23 with options
-		-X -A Apache2::AuthenOpenID
+    - original version; created by h2xs 1.23 with options
+        -X -A Apache2::AuthenOpenID
 
