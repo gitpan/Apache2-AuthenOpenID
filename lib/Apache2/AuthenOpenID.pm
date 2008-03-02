@@ -7,6 +7,8 @@ use Apache2::RequestRec ();
 use Apache2::Module;
 use Apache2::ServerUtil;
 use Apache2::Log;
+use Apache2::Access;
+use Apache2::CmdParms;
 use Apache2::Const -compile => qw(
     HTTP_UNAUTHORIZED OK DECLINED REDIRECT OR_AUTHCFG TAKE1
 );
@@ -17,7 +19,7 @@ use Digest::HMAC_SHA1;
 use LWPx::ParanoidAgent;
 use base qw( Class::Data::Inheritable );
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 __PACKAGE__->mk_classdata( auth_type => 'openid' );
 __PACKAGE__->init;
@@ -42,7 +44,7 @@ sub init {
             name            => 'trust_root',
             req_override    => Apache2::Const::OR_AUTHCFG,
             args_how        => Apache2::Const::TAKE1,
-            errmsg          => 'return_to http://sample.com/trust_root/',
+            errmsg          => 'trust_root http://sample.com/trust_root/',
         },
         {
             name            => 'consumer_secret',

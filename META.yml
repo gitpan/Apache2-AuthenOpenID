@@ -1,9 +1,11 @@
 --- #YAML:1.0
 name:                Apache2-AuthenOpenID
-version:             0.04
+version:             0.05
 abstract:            OpenID authen hander for mod_perl2.
 license:             ~
-generated_by:        ExtUtils::MakeMaker version 6.36
+author:              
+    - Nobuo Danjou <nobuo.danjou@gmail.com>
+generated_by:        ExtUtils::MakeMaker version 6.42
 distribution_type:   module
 requires:     
     CGI:                           0
@@ -13,7 +15,5 @@ requires:
     mod_perl2:                     2.000001
     Net::OpenID::Consumer:         0.14
 meta-spec:
-    url:     http://module-build.sourceforge.net/META-spec-v1.2.html
-    version: 1.2
-author:
-    - Nobuo Danjou <nobuo.danjou@gmail.com>
+    url:     http://module-build.sourceforge.net/META-spec-v1.3.html
+    version: 1.3
