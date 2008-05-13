@@ -19,7 +19,7 @@ use Digest::HMAC_SHA1;
 use LWPx::ParanoidAgent;
 use base qw( Class::Data::Inheritable );
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 __PACKAGE__->mk_classdata( auth_type => 'openid' );
 __PACKAGE__->init;
@@ -29,11 +29,6 @@ sub init {
     my $self = shift;
 
     my @directives = (
-        {
-            name            => 'AuthType',
-            req_override    => Apache2::Const::OR_AUTHCFG,
-            args_how        => Apache2::Const::TAKE1,
-        },
         {
             name            => 'return_to',
             req_override    => Apache2::Const::OR_AUTHCFG,
@@ -56,17 +51,10 @@ sub init {
 
     eval { 
         Apache2::Module::add($self, \@directives); 
-    };
-}
-
-sub AuthType {
-    my ($self, $params, $arg) = @_;
-    my $class = ref $self;
-    if (lc $arg eq lc $self->auth_type) {
         Apache2::ServerUtil->server->push_handlers(
-            PerlAuthenHandler => $class,
+            PerlAuthenHandler => $self,
         );
-    }
+    };
 }
 
 sub return_to {

@@ -1,7 +1,9 @@
 Changes
+lib/Apache2/AuthenOpenID.pm
 Makefile.PL
 MANIFEST
 README
 t/Apache2-AuthenOpenID.t
-lib/Apache2/AuthenOpenID.pm
+t/conf/extra.last.conf.in
+t/TEST.PL
 META.yml                                 Module meta-data (added by MakeMaker)

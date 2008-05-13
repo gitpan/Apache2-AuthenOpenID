@@ -1,0 +1,9 @@
+PerlLoadModule Apache2::AuthenOpenID
+<Location />
+    AuthType OpenID
+    AuthName "Apache2::AuthenOpenID test"
+    return_to /callback
+    trust_root /
+    consumer_secret "this is consumer_secret sample"
+    require valid-user
+</Location>

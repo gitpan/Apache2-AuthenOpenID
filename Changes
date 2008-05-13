@@ -1,7 +1,10 @@
 Revision history for Perl extension Apache2::AuthenOpenID.
 
+0.06  Mon May 12 11:15:00 JST 2008
+    - removed harmful code for AuthType directive.
+
 0.05  Sun Mar 02 12:45:00 JST 2008
-	- added missing use lines
+    - added missing use lines
 
 0.04  Sat Nov 10 12:21:00 JST 2007
     - made inheritable
