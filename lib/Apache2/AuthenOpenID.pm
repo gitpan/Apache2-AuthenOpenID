@@ -19,7 +19,7 @@ use Digest::HMAC_SHA1;
 use LWPx::ParanoidAgent;
 use base qw( Class::Data::Inheritable );
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 __PACKAGE__->mk_classdata( auth_type => 'openid' );
 __PACKAGE__->init;
@@ -59,29 +59,27 @@ sub init {
 
 sub return_to {
     my ($self, $params, $arg) = @_;
-    my $class = ref $self;
-    my $i = Apache2::Module::get_config($class, $params->server);
-    $i->{'return_to'} = $arg;
+    $self->{'return_to'} = $arg;
 }
 
 sub trust_root {
     my ($self, $params, $arg) = @_;
-    my $class = ref $self;
-    my $i = Apache2::Module::get_config($class, $params->server);
-    $i->{'trust_root'} = $arg;
+    $self->{'trust_root'} = $arg;
 }
 
 sub consumer_secret {
     my ($self, $params, $arg) = @_;
-    my $class = ref $self;
-    my $i = Apache2::Module::get_config($class, $params->server);
-    $i->{'consumer_secret'} = $arg;
+    $self->{'consumer_secret'} = $arg;
 }
 
 sub handler : method {
     my ($self, $r) = @_;
     lc $r->auth_type eq lc $self->auth_type or return Apache2::Const::DECLINED;
-    my $cf = Apache2::Module::get_config($self, $r->server);
+
+    my $cf = Apache2::Module::get_config($self, $r->server, $r->per_dir_config);
+    $r->log->debug(
+       sprintf "tr=%s rt=%s cs=%s", $cf->{'trust_root'}, $cf->{'return_to'}, $cf->{'consumer_secret'}
+    );
     unless ($cf->{'trust_root'} && $cf->{'return_to'} && $cf->{'consumer_secret'}) {
         $r->log_error("You need to specify trust_root, return_to, and consumer_secret.");
         die;
@@ -100,30 +98,46 @@ sub handler : method {
         . ($r->headers_in->{'X-Forwarded-Host'} || $r->hostname)
         . $r->uri;
 
-    my $q = CGI->new($r);
     my %cookie_in = CGI::Cookie->parse($r->headers_in->{Cookie});
 
-    my $csr = Net::OpenID::Consumer->new(
-        args => $q,
-        ua => LWPx::ParanoidAgent->new,
-        consumer_secret => $cf->{'consumer_secret'},
-    );
     if ($request_url eq $cf->{'return_to'}) {
-        if (my $identity = $q->param('identity')) {
+        my $q = CGI->new($r);
+        my $csr = Net::OpenID::Consumer->new(
+            args            => $q,
+            ua              => LWPx::ParanoidAgent->new,
+            consumer_secret => $cf->{'consumer_secret'},
+        );
+
+        $r->log->debug("$request_url is return_to");
+        if ($r->args eq 'logout') {
+            $r->log->debug("remove cookies to logout.");
+            my $cookie_out = CGI::Cookie->new(
+                -name => $cookie_name,
+                -value => 'erase',
+                -expires => '-1d',
+            );
+            $r->err_headers_out->add('Set-Cookie' => $cookie_out);
+            $r->headers_out->set('Location' => $cf->{'trust_root'});
+            return Apache2::Const::REDIRECT;
+        } elsif (my $identity = $q->param('identity')) {
             my $claimed_identity = $csr->claimed_identity($identity)
                 or return Apache2::Const::HTTP_UNAUTHORIZED;
             my $check_url = $claimed_identity->check_url(
                 return_to => $cf->{'return_to'},
                 trust_root => $cf->{'trust_root'},
             );
+            $r->log->debug("clamed_identity=$claimed_identity  check_url=$check_url");
             $r->err_headers_out->set(Location => $check_url);
             return Apache2::Const::REDIRECT;
         } elsif (my $setup_url = $csr->user_setup_url) {
+            $r->log->debug("setup_url=$setup_url");
             $r->err_headers_out->set(Location => $setup_url);
             return Apache2::Const::REDIRECT;
         } elsif ($csr->user_cancel) {
+            $r->log->debug("user_canceled.");
             return Apache2::Const::HTTP_UNAUTHORIZED;
         } elsif (my $vident = $csr->verified_identity) {
+            $r->log->debug('verified_identity');
             my $url = $vident->url;
             $url =~ s{(^https?://|/$)}{}g;
             my $time = time();
@@ -135,8 +149,10 @@ sub handler : method {
             $r->user($url);
             if (%cookie_in && (my $dest = $cookie_in{$cookie_dest_name})) {
                 $r->headers_out->set('Location' => $dest->value);
+                $r->log->debug('return to cookie_dest='. $dest->value);
             } else {
                 $r->headers_out->set('Location' => $cf->{'trust_root'});
+                $r->log->debug('redirect to trust_root');
             }
             my $cookie_dest_erase = CGI::Cookie->new(
                 -name => $cookie_dest_name,
@@ -147,6 +163,8 @@ sub handler : method {
             $r->err_headers_out->add('Set-Cookie' => $cookie_dest_erase);
             return Apache2::Const::REDIRECT;
         }
+
+        $r->log_error("Error validating identity: " . $csr->err);
         return Apache2::Const::HTTP_UNAUTHORIZED;
     }
     if (%cookie_in && $cookie_in{$cookie_name}){
@@ -169,7 +187,7 @@ sub handler : method {
 
 sub set_custom_response {
     my ($self, $r) = @_;
-    my $cf = Apache2::Module::get_config($self, $r->server);
+    my $cf = Apache2::Module::get_config($self, $r->server, $r->per_dir_config);
     my $auth_name = $r->auth_name;
     my $html = <<END;
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
@@ -254,14 +272,5 @@ L<http://openid.net/>
 =head1 AUTHOR
 
 Nobuo Danjou, L<nobuo.danjou@gmail.com>
-
-=head1 COPYRIGHT AND LICENSE
-
-Copyright (C) 2007 by Nobuo Danjou
-
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.8.8 or,
-at your option, any later version of Perl 5 you may have available.
-
 
 =cut

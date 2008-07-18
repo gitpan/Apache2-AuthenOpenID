@@ -1,9 +1,19 @@
 Changes
+inc/Module/Install.pm
+inc/Module/Install/Base.pm
+inc/Module/Install/Can.pm
+inc/Module/Install/Fetch.pm
+inc/Module/Install/Include.pm
+inc/Module/Install/Makefile.pm
+inc/Module/Install/Metadata.pm
+inc/Module/Install/Win32.pm
+inc/Module/Install/WriteAll.pm
+inc/Test/More.pm
 lib/Apache2/AuthenOpenID.pm
 Makefile.PL
 MANIFEST
+META.yml
 README
 t/Apache2-AuthenOpenID.t
 t/conf/extra.last.conf.in
 t/TEST.PL
-META.yml                                 Module meta-data (added by MakeMaker)

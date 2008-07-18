@@ -1,5 +1,9 @@
 Revision history for Perl extension Apache2::AuthenOpenID.
 
+0.07  Tue Jul 16 00:36:00 JST 2008
+    - merged patch from fujiwara, now get config with per_dir_config
+    - now you can logout accessing return_to url with query string 'logout'.
+
 0.06  Mon May 12 11:15:00 JST 2008
     - removed harmful code for AuthType directive.
 

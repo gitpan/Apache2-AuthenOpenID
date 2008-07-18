@@ -1,21 +1,26 @@
---- #YAML:1.0
-name:                Apache2-AuthenOpenID
-version:             0.06
-abstract:            OpenID authen hander for mod_perl2.
-license:             ~
-author:              
-    - Nobuo Danjou <nobuo.danjou@gmail.com>
-generated_by:        ExtUtils::MakeMaker version 6.44
-distribution_type:   module
-requires:     
-    Apache::Test:                  0
-    CGI:                           0
-    Class::Data::Inheritable:      0
-    Digest::HMAC_SHA1:             1.01
-    LWPx::ParanoidAgent:           1.03
-    mod_perl2:                     2.000001
-    Net::OpenID::Consumer:         0.14
-    Test::More:                    0.32
+---
+abstract: 'OpenID authen hander for mod_perl2.'
+author:
+  - 'Nobuo Danjou, L<nobuo.danjou@gmail.com>'
+build_requires:
+  Test::More: 0
+distribution_type: module
+generated_by: 'Module::Install version 0.73'
+license: unknown
 meta-spec:
-    url:     http://module-build.sourceforge.net/META-spec-v1.3.html
-    version: 1.3
+  url: http://module-build.sourceforge.net/META-spec-v1.3.html
+  version: 1.3
+name: Apache2-AuthenOpenID
+no_index:
+  directory:
+    - inc
+    - t
+requires:
+  CGI: 0
+  Class::Data::Inheritable: 0
+  Digest::HMAC_SHA1: 1.01
+  LWPx::ParanoidAgent: 1.03
+  Net::OpenID::Consumer: 0.14
+  perl: 5.8.0
+tests: t/*.t
+version: 0.07
