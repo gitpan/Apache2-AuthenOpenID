@@ -1,5 +1,9 @@
 Revision history for Perl extension Apache2::AuthenOpenID.
 
+0.08  Sun Apr 05 00:44:25 JST 2009
+    - fix typo (rt #42041)
+    - skip Apache::Test tests when TEST_MOD_PERL isn't set. (rt #42042)
+
 0.07  Tue Jul 16 00:36:00 JST 2008
     - merged patch from fujiwara, now get config with per_dir_config
     - now you can logout accessing return_to url with query string 'logout'.

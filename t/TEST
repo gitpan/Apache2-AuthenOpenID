@@ -1,0 +1,12 @@
+#!/usr/bin/perl
+# WARNING: this file is generated, do not edit
+# generated on Sun Apr  5 00:37:16 2009
+# 01: /usr/lib/perl5/vendor_perl/5.10.0/i386-linux-thread-multi/Apache/TestConfig.pm:955
+# 02: /usr/lib/perl5/vendor_perl/5.10.0/i386-linux-thread-multi/Apache/TestConfig.pm:1045
+# 03: /usr/lib/perl5/vendor_perl/5.10.0/i386-linux-thread-multi/Apache/TestMM.pm:141
+# 04: Makefile.PL:30
+
+BEGIN { eval { require blib && blib->import; } }
+use Apache::TestRunPerl;
+
+Apache::TestRunPerl->new->run(@ARGV);

@@ -19,7 +19,7 @@ use Digest::HMAC_SHA1;
 use LWPx::ParanoidAgent;
 use base qw( Class::Data::Inheritable );
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 __PACKAGE__->mk_classdata( auth_type => 'openid' );
 __PACKAGE__->init;
@@ -88,10 +88,10 @@ sub handler : method {
     my $cookie_dest_name = $cookie_name.'-destination';
     $self->set_custom_response($r);
 
-    $r->err_headers_out->set('Pragma' => 'no-chache');
+    $r->err_headers_out->set('Pragma' => 'no-cache');
     $r->err_headers_out->set(
         'Cache-control' 
-            => 'private, no-chache, no-store, must-revalidate, max-age=0'
+            => 'private, no-cache, no-store, must-revalidate, max-age=0'
     );
 
     my $request_url = "http://"
@@ -272,5 +272,10 @@ L<http://openid.net/>
 =head1 AUTHOR
 
 Nobuo Danjou, L<nobuo.danjou@gmail.com>
+
+=head1 LICENSE
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
 
 =cut

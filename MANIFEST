@@ -16,4 +16,5 @@ META.yml
 README
 t/Apache2-AuthenOpenID.t
 t/conf/extra.last.conf.in
+t/TEST
 t/TEST.PL
